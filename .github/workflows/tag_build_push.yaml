@@ -1,0 +1,60 @@
+name: Tag, build and push Workflow
+
+on: workflow_dispatch
+# on:
+#   push:
+#     branches: master
+
+env:
+  GCR_PROJECT_ID: ${{ secrets.GCR_PROJECT }}
+  IMAGE: webapp
+  GCLOUD_SERVICE_KEY: ${{ secrets.GCLOUD_SERVICE_KEY }}
+
+
+jobs:
+  scan:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GIT_HUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE}}
+  
+  build_test:
+  
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: npm ci, build and test
+        run: |
+          npm ci
+          npm run build --if-present
+          npm test
+
+  build-and-push-to-gcr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Build and push Docker
+        uses: RafikFarhad/push-to-gcr-github-action@v4.1
+        with:
+          gcloud_service_key: ${{ env.GCLOUD_SERVICE_KEY }}
+          registry: europe-west3-docker.pkg.dev/vaulted-bit-384519/diplomski
+          # project_id: ${{ env.GCR_PROJECT_ID }}
+          image_name: ${{ env.IMAGE }}
+          image_tag: latest, ${{ github.sha }}
+          # image_tag: ${{ env.new_version }}, latest
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'europe-west3-docker.pkg.dev/vaulted-bit-384519/diplomski/my-awesome-project/webapp:latest' #europe-west3-docker.pkg.dev/vaulted-bit-384519/diplomski/vaulted-bit-384519/webapp
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'

@@ -1,0 +1,23 @@
+name: Terraform Destroy
+on: workflow_dispatch
+
+env:
+  GCLOUD_SERVICE_KEY: ${{ secrets.GCLOUD_SERVICE_KEY }}
+
+jobs:
+  terraform_apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: hashicorp/setup-terraform@v2
+      
+      - name: Terraform
+        run: |
+          cd infra/terraform
+          export TF_VAR_CREDENTIALS=$GCLOUD_SERVICE_KEY
+          export TF_VAR_GCP_PROJECT=$GCP_PROJECT_ID
+          touch sa_key.json
+          echo $TF_VAR_CREDENTIALS > sa_key.json
+
+          terraform init
+          terraform destroy -auto-approve -no-color

@@ -1,0 +1,43 @@
+name: Deploy to GKE Workflow
+
+on: workflow_dispatch
+
+env:
+  GKE_PROJECT_ID: ${{ secrets.GKE_PROJECT }}
+  GKE_CLUSTER: tolar
+  GKE_ZONE: europe-west6
+  
+jobs:
+  deploy-to-gke:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
+        fetch-depth: 0
+
+    - name: GCP Auth
+      uses: google-github-actions/auth@v0
+      with:
+        credentials_json: ${{  secrets.GKE_SA_KEY }}
+
+    - name: GKE Auth
+      uses: google-github-actions/get-gke-credentials@v0
+      with:
+        cluster_name: ${{ env.GKE_CLUSTER }}
+        location: ${{ env.GKE_ZONE }}
+        project_id: ${{ secrets.GKE_PROJECT }}    
+
+    - name: Setup kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'latest'
+      id: install
+    
+    - name: Set up Helm
+      run: |-
+        sudo snap install helm --classic        
+
+    - name: Deploy
+      run: |-
+        helm upgrade -i web ./infra/kubernetes/helmchart

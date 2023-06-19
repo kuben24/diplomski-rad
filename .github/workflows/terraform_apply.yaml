@@ -1,0 +1,41 @@
+name: Terraform Apply
+on: workflow_dispatch
+
+env:
+  GCLOUD_SERVICE_KEY: ${{ secrets.GCLOUD_SERVICE_KEY }}
+  GCP_PROJECT_ID: ${{ secrets.GCR_PROJECT }}
+
+jobs:
+  checkov:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v1
+        with:
+          python-version: 3.8
+      - name: Test with Checkov
+        id: checkov
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: infra/terraform
+          framework: terraform 
+
+  terraform_apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: hashicorp/setup-terraform@v2
+      
+      - name: Terraform
+        run: |
+          cd infra/terraform
+          export TF_VAR_CREDENTIALS=$GCLOUD_SERVICE_KEY
+          export TF_VAR_GCP_PROJECT=$GCP_PROJECT_ID
+          touch sa_key.json
+          echo $TF_VAR_CREDENTIALS > sa_key.json
+
+          terraform init
+          terraform validate -no-color
+          terraform plan -no-color
+          terraform apply -auto-approve -input=false -no-color
